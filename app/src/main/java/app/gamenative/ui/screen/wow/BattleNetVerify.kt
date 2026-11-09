@@ -127,15 +127,31 @@ fun BattleNetVerifyScreen(
                         cookies.setAcceptThirdPartyCookies(this, true)
                         webViewClient = object : WebViewClient() {
                             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                                // Captcha and consent frames load in sub-frames; leave those to the WebView.
+                                if (!request.isForMainFrame) return false
                                 val url = request.url
-                                return when (url.scheme) {
-                                    "https" -> false
-                                    // Links such as mailto: belong to other apps; plain http stays blocked.
-                                    "http" -> true
-                                    else -> {
+                                Timber.i("Battle.net verify navigating to ${url.scheme}://${url.host}${url.path}")
+                                return when (url.scheme?.lowercase()) {
+                                    "https", "about", "data", "blob", "javascript" -> false
+                                    // Upgrade instead of leaving the app.
+                                    "http" -> {
+                                        view.loadUrl(url.buildUpon().scheme("https").build().toString())
+                                        true
+                                    }
+                                    // Pages that try to hand off to an app: stay in the WebView with the web fallback.
+                                    "intent" -> {
+                                        runCatching { Intent.parseUri(url.toString(), Intent.URI_INTENT_SCHEME) }.getOrNull()
+                                            ?.getStringExtra("browser_fallback_url")
+                                            ?.takeIf { it.startsWith("https://") }
+                                            ?.let(view::loadUrl)
+                                        true
+                                    }
+                                    "mailto", "tel" -> {
                                         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, url)) }
                                         true
                                     }
+                                    // Anything else (e.g. a Battle.net app link) is ignored so sign-in stays here.
+                                    else -> true
                                 }
                             }
 
