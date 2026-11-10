@@ -86,6 +86,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import app.gamenative.GameSessionService
 import app.gamenative.PluviaApp
 import app.gamenative.PrefManager
 import app.gamenative.data.GyroSettings
@@ -412,6 +413,11 @@ fun XServerScreen(
 ) {
     Timber.i("Starting up XServerScreen")
     val context = LocalContext.current
+    // Keep the game alive and connected while the player is in another app, e.g. fetching an authenticator code.
+    DisposableEffect(Unit) {
+        GameSessionService.start(context.applicationContext)
+        onDispose { GameSessionService.stop(context.applicationContext) }
+    }
     val view = LocalView.current
     val scope = rememberCoroutineScope()
     val imm = remember(context) {
